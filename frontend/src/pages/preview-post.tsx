@@ -1,66 +1,77 @@
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
 
-type Article = {
+type Post = {
   id: number;
   title: string;
   content: string;
   category: string;
-  status: "Publish" | "Draft" | "Trash";
+  status: "Draft" | "Publish";
+  created_date: string;
+  updated_date: string;
 };
 
-const PreviewPost: React.FC = () => {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+type ApiResponse = {
+  data: Post[];
+  success: boolean;
+};
 
-  const [limit] = useState<number>(5);
-  const [offset] = useState<number>(0);
-  const [page, setPage] = useState<number>(1);
+async function fetchPosts(limit: number, offset: number) {
+  const res = await axios.get<ApiResponse>(
+    `http://localhost:4000/article/${limit}/${offset}?status=Publish`
+  );
+  return res.data.data;
+}
 
-  const fetchArticles = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(
-        `http://localhost:4000/article/${limit}/${offset}?status=Publish`
-      );
+export default function PreviewPost() {
+  const [page, setPage] = useState(1);
+  const limit = 3;
+  const offset = (page - 1) * limit;
 
-      setArticles(res.data.data);
-    } catch (err) {
-      setError("Gagal memuat artikel");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading, error, isError } = useQuery<Post[]>({
+    queryKey: ["posts", limit, offset],
+    queryFn: () => fetchPosts(limit, offset),
+    placeholderData: (previousData) => previousData,
+  });
 
-  useEffect(() => {
-    fetchArticles();
-  }, [offset, limit]);
+  if (isLoading) {
+    return <p className="p-4 text-center">Loading...</p>;
+  }
+
+  if (isError) {
+    return (
+      <p className="p-4 text-red-500">
+        Gagal mengambil data:{" "}
+        {error instanceof Error ? error.message : "Error tidak diketahui"}
+      </p>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Blog</h1>
+      <h1 className="text-3xl font-bold mb-6">Posts</h1>
 
-      {loading && <p>Loading...</p>}
-      {error && <p className="text-red-500">{error}</p>}
+      {isLoading && <p>Loading...</p>}
+      {isError && <p className="text-red-500">{error}</p>}
 
       <div className="space-y-6">
-        {articles.map((article) => (
+        {data?.map((post) => (
           <div
-            key={article.id}
+            key={post.id}
             className="p-4 border rounded-lg shadow-sm hover:shadow-md transition"
           >
-            <h2 className="text-xl font-semibold">{article.title}</h2>
-            <p className="text-sm text-gray-500">{article.category}</p>
+            <h2 className="text-xl font-semibold">{post.title}</h2>
+            <p className="text-sm text-gray-500">{post.category}</p>
             <p className="mt-2 text-gray-700">
-              {article.content.slice(0, 120)}...
+              {post.content.slice(0, 120)}...
             </p>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mt-4">
         <Button
           variant="outline"
           disabled={page === 1}
@@ -69,12 +80,14 @@ const PreviewPost: React.FC = () => {
           Previous
         </Button>
         <span>Page {page}</span>
-        <Button variant="outline" onClick={() => setPage((prev) => prev + 1)}>
+        <Button
+          disabled={(data?.length ?? 0) < limit}
+          variant="outline"
+          onClick={() => setPage((prev) => prev + 1)}
+        >
           Next
         </Button>
       </div>
     </div>
   );
-};
-
-export default PreviewPost;
+}

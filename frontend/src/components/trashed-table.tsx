@@ -96,7 +96,11 @@ export default function TrashedTable() {
           Previous
         </Button>
         <span>Page {page}</span>
-        <Button variant="outline" onClick={() => setPage((prev) => prev + 1)}>
+        <Button
+          disabled={(data?.length ?? 0) < limit}
+          variant="outline"
+          onClick={() => setPage((prev) => prev + 1)}
+        >
           Next
         </Button>
       </div>
